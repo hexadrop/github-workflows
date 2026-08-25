@@ -46,6 +46,20 @@ jobs:
 |-------------|-------------------------------------|
 | `published` | `'true'` if packages were published |
 
+### `detect-changeset-change.yml`
+
+Detects whether there are semantic changeset changes since the previous commit.
+
+```yaml
+jobs:
+  detect:
+    uses: hexadrop/github-workflows/.github/workflows/detect-changeset-change.yml@v1
+```
+
+| Output              | Description                                              |
+|---------------------|----------------------------------------------------------|
+| `should_publish_beta` | `'true'` if there are changeset changes to publish     |
+
 ### `release-prepare.yml`
 
 Creates or updates the release pull request from changesets.

@@ -1,0 +1,37 @@
+name: "Detect changeset change"
+
+on:
+  workflow_call:
+    outputs:
+      should_publish_beta:
+        description: 'Whether there are changeset changes to publish'
+        value: ${{ jobs.detect.outputs.should_publish_beta }}
+
+jobs:
+  detect:
+    name: Detect changeset change
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect semantic changeset changes
+        id: detect
+        env:
+          AFTER: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [[ "$BEFORE" == "0000000000000000000000000000000000000000" ]]; then
+            echo "should_publish_beta=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git diff --quiet --diff-filter=AM "$BEFORE" "$AFTER" -- .changeset ':(exclude).changeset/README.md'; then
+            echo "should_publish_beta=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish_beta=true" >> "$GITHUB_OUTPUT"
+          fi
