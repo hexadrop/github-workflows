@@ -19,7 +19,7 @@ on:
 
 jobs:
   publish:
-    name: "Publish ${{ inputs.snapshot && 'beta' || 'stable' }}"
+    name: Publish
     runs-on: ubuntu-latest
     concurrency:
       group: ${{ inputs.concurrency-group }}

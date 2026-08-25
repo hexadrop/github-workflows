@@ -11,7 +11,7 @@ on:
 
 jobs:
   sync-to-develop:
-    name: Sync to develop
+    name: Sync
     if: github.event.pull_request.merged == true && github.head_ref != 'develop' && !startsWith(github.head_ref, 'develop-')
     timeout-minutes: 30
     runs-on: ubuntu-latest

@@ -11,7 +11,7 @@ on:
 
 jobs:
   release-prepare:
-    name: "Release: prepare"
+    name: Prepare
     runs-on: ubuntu-latest
     concurrency:
       group: release-prepare
