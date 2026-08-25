@@ -55,14 +55,12 @@ jobs:
   release-prepare:
     uses: hexadrop/github-workflows/.github/workflows/release-prepare.yml@v1
     with:
-      build-types: true
       base-branch: main
 ```
 
-| Input         | Required | Default | Description                                          |
-|---------------|----------|---------|------------------------------------------------------|
-| `build-types` | no       | `true`  | Run `bun build:types` before creating the release PR |
-| `base-branch` | no       | `main`  | Base branch for the release PR                       |
+| Input         | Required | Default | Description                    |
+|---------------|----------|---------|--------------------------------|
+| `base-branch` | no       | `main`  | Base branch for the release PR |
 
 ## Versioning
 

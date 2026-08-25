@@ -3,11 +3,6 @@ name: "Release: prepare"
 on:
   workflow_call:
     inputs:
-      build-types:
-        description: 'Whether to run bun build:types before creating the release PR'
-        required: false
-        type: boolean
-        default: true
       base-branch:
         description: 'Base branch for the release PR'
         required: false
@@ -70,10 +65,6 @@ jobs:
           done
 
           echo "has-release=false" >> "$GITHUB_OUTPUT"
-
-      - name: Build types
-        if: inputs.build-types && steps.release-version.outputs.has-release == 'true'
-        run: bun build:types
 
       - name: Create or update release pull request
         if: steps.release-version.outputs.has-release == 'true'
