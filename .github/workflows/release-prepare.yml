@@ -1,0 +1,118 @@
+name: "Release: prepare"
+
+on:
+  workflow_call:
+    inputs:
+      build-types:
+        description: 'Whether to run bun build:types before creating the release PR'
+        required: false
+        type: boolean
+        default: true
+      base-branch:
+        description: 'Base branch for the release PR'
+        required: false
+        type: string
+        default: 'main'
+
+jobs:
+  release-prepare:
+    name: "Release: prepare"
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-prepare
+      cancel-in-progress: false
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ inputs.base-branch }}:${{ inputs.base-branch }}
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Capture release version
+        id: release-version
+        shell: bash
+        run: |
+          shopt -s nullglob
+
+          for changeset in .changeset/*.md; do
+            if [[ "$changeset" == ".changeset/README.md" ]]; then
+              continue
+            fi
+
+            if bun changeset status --output=release.json; then
+              version="$(jq -r '.releases[0].newVersion // empty' release.json)"
+              rm release.json
+
+              if [[ -n "$version" ]]; then
+                echo "has-release=true" >> "$GITHUB_OUTPUT"
+                echo "version=$version" >> "$GITHUB_OUTPUT"
+              else
+                echo "has-release=false" >> "$GITHUB_OUTPUT"
+              fi
+            else
+              echo "has-release=false" >> "$GITHUB_OUTPUT"
+            fi
+
+            exit 0
+          done
+
+          echo "has-release=false" >> "$GITHUB_OUTPUT"
+
+      - name: Build types
+        if: inputs.build-types && steps.release-version.outputs.has-release == 'true'
+        run: bun build:types
+
+      - name: Create or update release pull request
+        if: steps.release-version.outputs.has-release == 'true'
+        uses: changesets/action@v2.1.1
+        with:
+          version-script: bun changeset version
+          pr-base-branch: ${{ inputs.base-branch }}
+          pr-draft: always
+          commit-message: 'chore: release v${{ steps.release-version.outputs.version }}'
+          pr-title: 'chore: release v${{ steps.release-version.outputs.version }}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add release label to release pull request
+        if: steps.release-version.outputs.has-release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="$(gh pr list --repo "$GITHUB_REPOSITORY" --base ${{ inputs.base-branch }} --head changeset-release/${{ inputs.base-branch }} --state open --json number --jq '.[0].number // empty')"
+          if [[ -z "$pr_number" ]]; then
+            echo "Release pull request not found. Skipping."
+            exit 0
+          fi
+
+          gh pr edit "$pr_number" --add-label release
+
+      - name: Add merge reminder to release pull request
+        if: steps.release-version.outputs.has-release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          pr_number="$(gh pr list --repo "$GITHUB_REPOSITORY" --base ${{ inputs.base-branch }} --head changeset-release/${{ inputs.base-branch }} --state open --json number --jq '.[0].number // empty')"
+          if [[ -z "$pr_number" ]]; then
+            echo "Release pull request not found. Skipping."
+            exit 0
+          fi
+
+          reminder_exists="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr_number/comments" --jq 'any(.[].body; contains("Merge this pull request using"))')"
+          if [[ "$reminder_exists" == false ]]; then
+            gh pr comment "$pr_number" --body "> [!IMPORTANT]
+          > Merge this pull request using **Create a merge commit** so ${{ inputs.base-branch }} keeps the full history from develop."
+          fi
