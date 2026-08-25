@@ -1,6 +1,6 @@
 # Hexadrop GitHub Workflows
 
-Reusable GitHub Actions workflows shared across Hexadrop repositories.
+Reusable GitHub Actions workflows shared across repositories.
 
 ## Workflows
 
