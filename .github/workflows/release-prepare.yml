@@ -91,7 +91,7 @@ jobs:
 
           gh pr edit "$pr_number" --add-label release
 
-      - name: Add merge reminder to release pull request
+      - name: Add merge reminder to release pull request body
         if: steps.release-version.outputs.has-release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -102,8 +102,10 @@ jobs:
             exit 0
           fi
 
-          reminder_exists="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr_number/comments" --jq 'any(.[].body; contains("Merge this pull request using"))')"
-          if [[ "$reminder_exists" == false ]]; then
-            gh pr comment "$pr_number" --body "> [!IMPORTANT]
+          body="$(gh pr view "$pr_number" --json body --jq '.body')"
+          if [[ "$body" != *"Merge this pull request using"* ]]; then
+            reminder="> [!IMPORTANT]
           > Merge this pull request using **Create a merge commit** so ${{ inputs.base-branch }} keeps the full history from develop."
+            new_body="${body}"$'\n\n'"${reminder}"
+            jq -n --arg body "$new_body" '{"body": $body}' | gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --method PATCH --input -
           fi
