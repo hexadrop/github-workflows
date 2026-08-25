@@ -14,15 +14,15 @@ jobs:
     uses: hexadrop/github-workflows/.github/workflows/check.yml@v1
     with:
       commands: '["lint:ci", "typecheck"]'
-      build-types: true
-      eslint-cache: true
+      cache-commands: '["lint:ci"]'
 ```
 
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `commands` | no | `["lint:ci", "typecheck"]` | JSON array of commands to run |
-| `build-types` | no | `true` | Run `bun build:types` before the commands |
-| `eslint-cache` | no | `true` | Enable ESLint cache for `lint:ci` |
+| Input            | Required | Default                    | Description                                  |
+|------------------|----------|----------------------------|----------------------------------------------|
+| `commands`       | no       | `["lint:ci", "typecheck"]` | JSON array of commands to run                |
+| `cache-commands` | no       | `["lint:ci"]`              | JSON array of commands that should use cache |
+
+The cache key is composed as `${{ runner.os }}-${{ matrix.command }}`.
 
 ### `release.yml`
 
@@ -37,13 +37,13 @@ jobs:
       concurrency-group: release
 ```
 
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `snapshot` | no | `false` | Publish a beta snapshot |
-| `concurrency-group` | yes | - | Concurrency group name |
+| Input               | Required | Default | Description             |
+|---------------------|----------|---------|-------------------------|
+| `snapshot`          | no       | `false` | Publish a beta snapshot |
+| `concurrency-group` | yes      | -       | Concurrency group name  |
 
-| Output | Description |
-|---|---|
+| Output      | Description                         |
+|-------------|-------------------------------------|
 | `published` | `'true'` if packages were published |
 
 ### `release-prepare.yml`
@@ -59,10 +59,10 @@ jobs:
       base-branch: main
 ```
 
-| Input | Required | Default | Description |
-|---|---|---|---|
-| `build-types` | no | `true` | Run `bun build:types` before creating the release PR |
-| `base-branch` | no | `main` | Base branch for the release PR |
+| Input         | Required | Default | Description                                          |
+|---------------|----------|---------|------------------------------------------------------|
+| `build-types` | no       | `true`  | Run `bun build:types` before creating the release PR |
+| `base-branch` | no       | `main`  | Base branch for the release PR                       |
 
 ## Versioning
 
