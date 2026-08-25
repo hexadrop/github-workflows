@@ -76,6 +76,27 @@ jobs:
 |---------------|----------|---------|--------------------------------|
 | `base-branch` | no       | `main`  | Base branch for the release PR |
 
+### `sync-to-develop.yml`
+
+Creates a sync PR from the merged base branch to the corresponding develop branch.
+
+```yaml
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  sync-to-develop:
+    uses: hexadrop/github-workflows/.github/workflows/sync-to-develop.yml@v1
+    with:
+      pr-title: 'chore: sync from {{main_branch}} to {{develop_branch}}'
+```
+
+| Input      | Required | Default                                               | Description                                                              |
+|------------|----------|-------------------------------------------------------|--------------------------------------------------------------------------|
+| `pr-title` | no       | `chore: sync from {{main_branch}} to {{develop_branch}}` | Title for the sync PR. Use `{{main_branch}}` and `{{develop_branch}}` placeholders |
+
 ## Versioning
 
 This repository follows semantic versioning via Git tags:
