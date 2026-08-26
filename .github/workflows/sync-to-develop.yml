@@ -48,8 +48,16 @@ jobs:
         run: |
           sync_branch="${{ steps.sync-branch.outputs.SYNC_BRANCH }}"
           if [[ -n $(git ls-remote --heads origin "$sync_branch") ]]; then
-            pull_request=$(gh api "/repos/${{ github.repository }}/pulls" --jq ".[] | select(.head.ref==\"$sync_branch\") | .number")
+            pull_request=$(gh api "/repos/${{ github.repository }}/pulls?state=open" --jq ".[] | select(.head.ref==\"$sync_branch\") | .number")
             echo "PULL_REQUEST=$pull_request" >> "$GITHUB_OUTPUT"
+
+            if [[ -n "$pull_request" ]]; then
+              body="$(gh pr view "$pull_request" --json body --jq '.body')"
+              delimiter="$(openssl rand -hex 8)"
+              echo "EXISTING_BODY<<${delimiter}" >> "$GITHUB_OUTPUT"
+              echo "$body" >> "$GITHUB_OUTPUT"
+              echo "${delimiter}" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Commit changes
@@ -84,8 +92,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          current_pr="${{ github.event.pull_request.number }}"
+          existing_body="${{ steps.get-info.outputs.EXISTING_BODY }}"
+
+          related_prs=""
+          if [[ -n "$existing_body" ]]; then
+            existing_prs="$(echo "$existing_body" | grep -oE '^- #[0-9]+' | sed 's/^- #//' | tr '\n' ' ')"
+            related_prs="$existing_prs"
+          fi
+
+          if [[ ! " $related_prs " =~ " $current_pr " ]]; then
+            related_prs="$related_prs $current_pr"
+          fi
+
           pr_body="**Automated Pull Request** related to:"
-          pr_body="$pr_body"$'\n'"- #${{ github.event.pull_request.number }}"
+          for pr in $related_prs; do
+            pr_body="$pr_body"$'\n'"- #$pr"
+          done
+
           pr_body="$pr_body"$'\n\n'
           pr_body="$pr_body"$'\n'"> [!IMPORTANT]"
           pr_body="$pr_body"$'\n'"> Merge this pull request using **Create a merge commit** so develop keeps the full history from ${{ steps.sync-branch.outputs.MAIN_BRANCH }}."
