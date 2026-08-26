@@ -26,7 +26,10 @@ The cache key is composed as `${{ runner.os }}-${{ matrix.command }}`.
 
 ### `release.yml`
 
-Publishes stable or beta releases to npm using Changesets and OIDC provenance.
+Publishes stable or beta releases using Changesets. Two publish strategies are supported:
+
+- **`npm`** (default) — publishes to the npm registry with OIDC provenance (`latest` for stable, `beta` for snapshots).
+- **`tags`** — for GitHub Action repos: tags `vX.Y.Z`, force-moves the major tag `vX`, and creates GitHub Releases (latest for stable, prerelease for snapshots). No npm publish.
 
 ```yaml
 jobs:
@@ -37,14 +40,31 @@ jobs:
       concurrency-group: release
 ```
 
-| Input               | Required | Default | Description             |
-|---------------------|----------|---------|-------------------------|
-| `snapshot`          | no       | `false` | Publish a beta snapshot |
-| `concurrency-group` | yes      | -       | Concurrency group name  |
+GitHub Action repo (tags strategy):
 
-| Output      | Description                         |
-|-------------|-------------------------------------|
-| `published` | `'true'` if packages were published |
+```yaml
+jobs:
+  release:
+    uses: hexadrop/github-workflows/.github/workflows/release.yml@v1
+    with:
+      snapshot: false
+      concurrency-group: release
+      publish-strategy: tags
+      build-command: bun run build
+```
+
+| Input               | Required | Default | Description                                                                                          |
+|---------------------|----------|---------|------------------------------------------------------------------------------------------------------|
+| `snapshot`          | no       | `false` | Publish a beta snapshot                                                                              |
+| `concurrency-group` | yes      | -       | Concurrency group name                                                                               |
+| `publish-strategy`  | no       | `npm`   | `npm` publishes to the npm registry; `tags` creates git tags and GitHub Releases                     |
+| `build-command`     | no       | `''`    | Build command run before tagging (tags strategy only); `dist/index.js` is committed if it changed    |
+
+With the `tags` strategy, stable releases create the tag `vX.Y.Z` (from `package.json`), force-move the major tag `vX`, and create a GitHub Release with `--latest --generate-notes`. Snapshot releases compute a beta version via `bun changeset version --snapshot beta`, restore `package.json`/`CHANGELOG.md` afterwards, tag the snapshot version, and create a GitHub prerelease. Existing tags are skipped, so reruns are safe.
+
+| Output      | Description                                 |
+|-------------|---------------------------------------------|
+| `published` | `'true'` if packages were published or tags created |
 
 ### `detect-changeset-change.yml`
 
@@ -72,9 +92,10 @@ jobs:
       base-branch: main
 ```
 
-| Input         | Required | Default | Description                    |
-|---------------|----------|---------|--------------------------------|
-| `base-branch` | no       | `main`  | Base branch for the release PR |
+| Input             | Required | Default                 | Description                                                                                                  |
+|-------------------|----------|-------------------------|--------------------------------------------------------------------------------------------------------------|
+| `base-branch`     | no       | `main`                  | Base branch for the release PR                                                                               |
+| `version-command` | no       | `bun changeset version` | Command used to version the release. GitHub Action repos can use `bun changeset version && bun run build && git add dist/index.js` to ship the rebuilt bundle in the release PR |
 
 ### `sync-to-develop.yml`
 
@@ -105,3 +126,5 @@ This repository follows semantic versioning via Git tags:
 - `v1` — floating alias that receives backward-compatible updates
 
 Use `@v1` for flexibility or `@v1.0.0` for reproducibility.
+
+After a backward-compatible change merges to `main`, a maintainer tags a new semver release (e.g. `v1.8.0`) and force-moves the floating alias (`git tag -f v1 v1.8.0 && git push -f origin v1`). Only then do `@v1` callers pick up the change; until the alias moves, existing consumers are unaffected.

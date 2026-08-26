@@ -12,6 +12,16 @@ on:
         description: 'Concurrency group name'
         required: true
         type: string
+      publish-strategy:
+        description: 'How releases are published: npm registry or git tags + GitHub Releases'
+        required: false
+        type: string
+        default: 'npm'
+      build-command:
+        description: 'Optional build command run before tagging (tags strategy only); dist/index.js is committed if changed'
+        required: false
+        type: string
+        default: ''
     outputs:
       published:
         description: 'Whether packages were published'
@@ -26,11 +36,11 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: 'write'
-      id-token: 'write'
+      id-token: 'write' # npm provenance only; unused by the tags strategy
       issues: 'write'
       pull-requests: 'write'
     outputs:
-      published: ${{ steps.changesets.outputs.published }}
+      published: ${{ steps.changesets.outputs.published || steps.tag-release.outputs.published || steps.tag-snapshot.outputs.published }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -41,6 +51,7 @@ jobs:
           bun-version: latest
 
       - name: Setup Node.js
+        if: inputs.publish-strategy == 'npm'
         uses: actions/setup-node@v7
         with:
           node-version: '24'
@@ -50,22 +61,22 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Generate beta snapshot
-        if: inputs.snapshot
+        if: inputs.snapshot && inputs.publish-strategy == 'npm'
         run: bun changeset version --snapshot beta
 
       - name: Publish beta to npm
-        if: inputs.snapshot
+        if: inputs.snapshot && inputs.publish-strategy == 'npm'
         run: bun changeset publish --tag beta --no-git-tag
 
       - name: Capture release version
-        if: ${{ !inputs.snapshot }}
+        if: ${{ !inputs.snapshot && inputs.publish-strategy == 'npm' }}
         run: |
           bun changeset status --output=release.json
           echo "NEW_VERSION=$(jq -r '.releases[0].newVersion' release.json)" >> "$GITHUB_ENV"
           rm release.json
 
       - name: Create Release Pull Request or Publish to npm
-        if: ${{ !inputs.snapshot }}
+        if: ${{ !inputs.snapshot && inputs.publish-strategy == 'npm' }}
         id: changesets
         uses: changesets/action@v2.1.1
         with:
@@ -75,3 +86,74 @@ jobs:
           pr-title: 'chore: release v${{env.NEW_VERSION}}'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and commit dist
+        if: inputs.publish-strategy == 'tags' && inputs.build-command != ''
+        shell: bash
+        run: |
+          ${{ inputs.build-command }}
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/index.js
+
+          if git diff --cached --quiet; then
+            echo "No dist changes to commit."
+          else
+            git commit -m "chore: build dist"
+            git push
+          fi
+
+      - name: Tag stable release
+        if: inputs.publish-strategy == 'tags' && !inputs.snapshot
+        id: tag-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="$(jq -r '.version' package.json)"
+          tag="v${version}"
+          major="v${version%%.*}"
+
+          if git rev-parse -q --verify "refs/tags/${tag}" > /dev/null; then
+            echo "Tag ${tag} already exists. Skipping."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git tag "${tag}"
+          git push origin "${tag}"
+
+          git tag -f "${major}" "${tag}"
+          git push -f origin "${major}"
+
+          gh release create "${tag}" --latest --generate-notes
+
+          echo "published=true" >> "$GITHUB_OUTPUT"
+
+      - name: Tag beta snapshot release
+        if: inputs.publish-strategy == 'tags' && inputs.snapshot
+        id: tag-snapshot
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bun changeset version --snapshot beta
+          version="$(jq -r '.version' package.json)"
+          git checkout -- package.json
+          git checkout -- CHANGELOG.md 2> /dev/null || true
+
+          tag="v${version}"
+
+          if git rev-parse -q --verify "refs/tags/${tag}" > /dev/null; then
+            echo "Tag ${tag} already exists. Skipping."
+            echo "published=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git tag "${tag}"
+          git push origin "${tag}"
+
+          gh release create "${tag}" --prerelease --generate-notes
+
+          echo "published=true" >> "$GITHUB_OUTPUT"
