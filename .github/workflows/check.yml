@@ -1,0 +1,46 @@
+name: Check
+
+on:
+  workflow_call:
+    inputs:
+      commands:
+        description: 'JSON array of commands to run (e.g. ["lint:ci", "typecheck"])'
+        required: false
+        type: string
+        default: '["lint:ci", "typecheck"]'
+      cache-commands:
+        description: 'JSON array of commands that should use a cache'
+        required: false
+        type: string
+        default: '["lint:ci"]'
+
+jobs:
+  check:
+    name: ${{ matrix.command }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+    strategy:
+      matrix:
+        command: ${{ fromJson(inputs.commands) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Cache
+        uses: actions/cache@v6
+        if: contains(fromJson(inputs.cache-commands), matrix.command)
+        with:
+          path: .eslintcache
+          key: ${{ runner.os }}-${{ matrix.command }}
+
+      - name: ${{ matrix.command }}
+        run: bun run ${{ matrix.command }}
