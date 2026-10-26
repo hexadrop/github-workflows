@@ -22,6 +22,11 @@ on:
         required: false
         type: string
         default: 'npm'
+      package-json-path:
+        description: 'Path to the package manifest that holds the version, relative to the repository root'
+        required: false
+        type: string
+        default: 'package.json'
     outputs:
       published:
         description: 'Whether packages were published'
@@ -176,11 +181,12 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_JSON_PATH: ${{ inputs.package-json-path }}
         run: |
           bun changeset version --snapshot beta
-          version="$(jq -r '.version' package.json)"
-          git checkout -- package.json
-          git checkout -- CHANGELOG.md 2> /dev/null || true
+          version="$(jq -r '.version' "${PACKAGE_JSON_PATH}")"
+          git checkout -- "${PACKAGE_JSON_PATH}"
+          git checkout -- "$(dirname "${PACKAGE_JSON_PATH}")/CHANGELOG.md" 2> /dev/null || true
 
           tag="v${version}"
 
@@ -233,8 +239,9 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGE_JSON_PATH: ${{ inputs.package-json-path }}
         run: |
-          version="$(jq -r '.version' package.json)"
+          version="$(jq -r '.version' "${PACKAGE_JSON_PATH}")"
           tag="v${version}"
           major="v${version%%.*}"
 
