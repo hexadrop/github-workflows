@@ -31,7 +31,15 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch
-        run: git fetch origin ${{ inputs.base-branch }}:${{ inputs.base-branch }}
+        env:
+          BASE_BRANCH: ${{ inputs.base-branch }}
+        run: |
+          if [[ "${BASE_BRANCH}" == "${GITHUB_REF_NAME}" ]]; then
+            echo "The release runs from ${BASE_BRANCH}; nothing to fetch."
+            exit 0
+          fi
+
+          git fetch origin "${BASE_BRANCH}:${BASE_BRANCH}"
 
       - name: Setup bun
         uses: oven-sh/setup-bun@v2

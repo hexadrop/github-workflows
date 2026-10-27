@@ -62,8 +62,9 @@ jobs:
 | `concurrency-group` | yes      | -            | Concurrency group name                                                                                  |
 | `target`            | no       | `'registry'` | `registry` publishes to the npm registry; `tags` creates git tags and GitHub Releases                   |
 | `publish-strategy`  | no       | `'npm'`      | **Deprecated.** Use `target` instead. Accepts `npm`/`registry` or `tags`.                               |
+| `package-json-path` | no       | `package.json` | Manifest that holds the version. Set it in monorepos, where the root manifest has no version.         |
 
-With the `tags` target, stable releases create the tag `vX.Y.Z` (from `package.json`), force-move the major tag `vX`, and create a GitHub Release with `--latest --generate-notes`. Snapshot releases compute a beta version via `bun changeset version --snapshot beta`, restore `package.json`/`CHANGELOG.md` afterwards, tag the snapshot version, and create a GitHub prerelease. Existing tags are skipped, so reruns are safe.
+With the `tags` target, stable releases create the tag `vX.Y.Z` (from `package-json-path`), force-move the major tag `vX`, and create a GitHub Release with `--latest --generate-notes`. Snapshot releases compute a beta version via `bun changeset version --snapshot beta`, restore `package.json`/`CHANGELOG.md` afterwards, tag the snapshot version, and create a GitHub prerelease. Existing tags are skipped, so reruns are safe.
 
 | Output      | Description                                              |
 |-------------|----------------------------------------------------------|
