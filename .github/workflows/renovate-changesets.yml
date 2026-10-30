@@ -28,9 +28,9 @@ jobs:
     steps:
       - name: Mint app token
         id: app
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.HEXABOT_APP_ID }}
+          client-id: ${{ vars.HEXABOT_CLIENT_ID }}
           private-key: ${{ secrets.app-private-key }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}

@@ -50,7 +50,7 @@ jobs:
 |-------------------|----------|-----------------------------------------|
 | `app-private-key` | yes      | Private key of the `hexabot` GitHub App |
 
-The app id is read from the `HEXABOT_APP_ID` variable. The workflow does not use `GITHUB_TOKEN` at all: it is scoped to `permissions: {}` and every API call goes through the app installation token, limited to the current repository with `contents: write` and `pull-requests: write`.
+The client id is read from the `HEXABOT_CLIENT_ID` variable. The workflow does not use `GITHUB_TOKEN` at all: it is scoped to `permissions: {}` and every API call goes through the app installation token, limited to the current repository with `contents: write` and `pull-requests: write`.
 
 ### `release.yml`
 
