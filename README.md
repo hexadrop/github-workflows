@@ -82,14 +82,17 @@ The workflow:
 1. Ignores bot comments and only accepts `OWNER`, `MEMBER` or `COLLABORATOR` authors.
 2. Marks `changeset-release/*` pull requests as ready (they are created as drafts) and refuses other drafts.
 3. Refuses conflicted pull requests and updates the branch when it is behind its base.
-4. Approves the pull request with the app, merges it directly when it is ready, and enables GitHub auto-merge with the resolved method when the checks are still running. The required checks are always enforced by GitHub.
-5. Comments the result and reacts with 👀 / 🚀 / 👎.
+4. Waits for the checks of the head commit (up to 15 minutes) and refuses if any of them fails.
+5. Merges with the resolved method using the app token, without asking for an approval.
+6. Comments the result and reacts with 👀 / 🚀 / 👎.
 
-Auto-merge has to be enabled in the repository:
+The merge is done by the app, so `hexabot` has to be in the ruleset bypass list; otherwise GitHub rejects it with `At least 1 approving review is required`:
 
 ```bash
-gh api --method PATCH "repos/$OWNER/$REPO" -F allow_auto_merge=true
+RENOVATE_APP_ID=5542332 ./scripts/apply-renovate-bypass.sh --apply   # in hexadrop/renovate-config
 ```
+
+The bypass also skips the required status checks, which is why the workflow verifies every check run of the head commit before merging.
 
 The caller has to live on the default branch: `issue_comment` only runs workflows from there. `HEXABOT_CLIENT_ID` and `HEXABOT_PRIVATE_KEY` are required.
 
