@@ -28,6 +28,7 @@ jobs:
           private-key: ${{ secrets.app-private-key }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
+          permission-checks: read
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
@@ -79,7 +80,7 @@ jobs:
           react "eyes"
 
           pr="$(gh pr view "$PR_NUMBER" \
-            --json id,headRefName,baseRefName,isDraft,mergeable,mergeStateStatus,headRefOid,autoMergeRequest,reviewDecision)"
+            --json id,headRefName,baseRefName,isDraft,mergeable,mergeStateStatus,headRefOid)"
           pr_id="$(jq -r '.id' <<< "$pr")"
           head="$(jq -r '.headRefName' <<< "$pr")"
           base="$(jq -r '.baseRefName' <<< "$pr")"
@@ -87,7 +88,6 @@ jobs:
           mergeable="$(jq -r '.mergeable' <<< "$pr")"
           state="$(jq -r '.mergeStateStatus' <<< "$pr")"
           sha="$(jq -r '.headRefOid' <<< "$pr")"
-          queued="$(jq -r '.autoMergeRequest != null' <<< "$pr")"
 
           method="squash"
           case "$head" in
@@ -127,46 +127,44 @@ jobs:
               -f query='mutation($pr: ID!, $sha: GitObjectID) { updatePullRequestBranch(input: {pullRequestId: $pr, expectedHeadOid: $sha}) { clientMutationId } }' \
               -f pr="$pr_id" \
               -f sha="$sha" > /dev/null
+            sha="$(gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
             echo "Updated the branch with $base"
           fi
 
-          if [ "$queued" = "true" ]; then
-            post "Auto-merge is already queued with **$method**."
-            react "rocket"
-            exit 0
-          fi
+          deadline=$((SECONDS + 900))
+          started=$SECONDS
 
-          gh api --method POST "/repos/$GH_REPO/pulls/$PR_NUMBER/reviews" \
-            -f event=APPROVE \
-            -f body="Approved by hexabot for \`/merge\`." > /dev/null 2>&1 \
-            || echo "Could not approve the pull request (already approved or authored by the app)"
+          while :; do
+            runs="$(gh api "/repos/$GH_REPO/commits/$sha/check-runs?per_page=100&filter=latest")"
+            total="$(jq -r '.total_count' <<< "$runs")"
+            pending="$(jq '[.check_runs[] | select(.status != "completed")] | length' <<< "$runs")"
+            failing="$(jq -r '[.check_runs[] | select(.status == "completed") | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral") | .name] | join(", ")' <<< "$runs")"
 
-          if [ "$method" = "merge" ]; then
-            merge_method="MERGE"
-          else
-            merge_method="SQUASH"
-          fi
-
-          state="$(gh pr view "$PR_NUMBER" --json mergeStateStatus --jq '.mergeStateStatus')"
-
-          if [ "$state" = "CLEAN" ]; then
-            if output="$(gh api --method PUT "/repos/$GH_REPO/pulls/$PR_NUMBER/merge" \
-              -f merge_method="$method" \
-              -f sha="$sha" 2>&1)"; then
-              post "Merged with **$method** at \`${sha:0:7}\`."
-              react "rocket"
-            else
-              refuse "Merge failed: $output"
+            if [ -n "$failing" ]; then
+              refuse "These checks are failing: $failing. Fix them and run \`/merge\` again."
             fi
-            exit 0
-          fi
 
-          if gh api graphql \
-            -f query='mutation($pr: ID!, $method: PullRequestMergeMethod!) { enablePullRequestAutoMerge(input: {pullRequestId: $pr, mergeMethod: $method}) { pullRequest { number } } }' \
-            -f pr="$pr_id" \
-            -f method="$merge_method" > /dev/null; then
-            post "Queued **$method** merge for \`${sha:0:7}\`. GitHub will merge it as soon as the required checks pass."
+            if [ "$pending" = "0" ]; then
+              if [ "$total" != "0" ] || [ $((SECONDS - started)) -ge 60 ]; then
+                break
+              fi
+              echo "Waiting for the checks to start..."
+            else
+              echo "Waiting for $pending check(s)..."
+            fi
+
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              refuse "The checks are still running after 15 minutes. Run \`/merge\` again when they finish."
+            fi
+
+            sleep 20
+          done
+
+          if output="$(gh api --method PUT "/repos/$GH_REPO/pulls/$PR_NUMBER/merge" \
+            -f merge_method="$method" \
+            -f sha="$sha" 2>&1)"; then
+            post "Merged with **$method** at \`${sha:0:7}\`."
             react "rocket"
           else
-            refuse "Could not merge or enable auto-merge (state: $state). Check that auto-merge is enabled in the repository settings."
+            refuse "Merge failed: $output"
           fi
