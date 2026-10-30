@@ -8,6 +8,15 @@ on:
         required: false
         type: string
         default: 'chore: sync from {{main_branch}} to {{develop_branch}}'
+      use-app-token:
+        description: 'Push the sync branch with the hexabot GitHub App token instead of GITHUB_TOKEN'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      app-private-key:
+        description: 'Private key of the hexabot GitHub App. Required when use-app-token is true'
+        required: false
 
 jobs:
   sync-to-develop:
@@ -23,6 +32,19 @@ jobs:
       pull-requests: write
       issues: write
     steps:
+      - name: Mint app token
+        id: app
+        if: inputs.use-app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.HEXABOT_APP_ID }}
+          private-key: ${{ secrets.app-private-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+
       - name: Calculate branches
         id: sync-branch
         run: |
@@ -39,12 +61,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.base_ref }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ inputs.use-app-token && steps.app.outputs.token || secrets.GITHUB_TOKEN }}
 
       - name: Get existent branches and pull requests from repository
         id: get-info
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ inputs.use-app-token && steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           sync_branch="${{ steps.sync-branch.outputs.SYNC_BRANCH }}"
           if [[ -n $(git ls-remote --heads origin "$sync_branch") ]]; then
@@ -63,7 +85,7 @@ jobs:
       - name: Commit changes
         id: commit
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ inputs.use-app-token && steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           develop="${{ steps.sync-branch.outputs.DEVELOP_BRANCH }}"
           if [[ -z $(git ls-remote --heads origin "$develop") ]]; then
@@ -90,7 +112,7 @@ jobs:
       - name: Create PR body
         id: pr-body
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ inputs.use-app-token && steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           current_pr="${{ github.event.pull_request.number }}"
           existing_body="${{ steps.get-info.outputs.EXISTING_BODY }}"
@@ -122,7 +144,7 @@ jobs:
 
       - name: Create Automated PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ inputs.use-app-token && steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           develop="${{ steps.sync-branch.outputs.DEVELOP_BRANCH }}"
           pull_request="${{ steps.get-info.outputs.PULL_REQUEST }}"
@@ -145,7 +167,7 @@ jobs:
       - name: Add PR comment - On Failure
         if: ${{ failure() && !cancelled() }}
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ inputs.use-app-token && steps.app.outputs.token || secrets.GITHUB_TOKEN }}
         run: |
           gh pr comment ${{ github.event.number }} --body "
           ### Sync to develop failure
