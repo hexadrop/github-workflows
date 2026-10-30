@@ -13,7 +13,8 @@ jobs:
   approve:
     name: Approve
     if: >-
-      github.event.pull_request.user.login == 'app/renovate' &&
+      github.event.pull_request.user.type == 'Bot' &&
+      startsWith(github.event.pull_request.head.ref, 'renovate/') &&
       github.event.pull_request.draft == false &&
       contains(github.event.pull_request.labels.*.name, 'dependencies')
     runs-on: ubuntu-latest
