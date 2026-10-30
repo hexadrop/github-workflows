@@ -135,10 +135,11 @@ jobs:
           started=$SECONDS
 
           while :; do
-            runs="$(gh api "/repos/$GH_REPO/commits/$sha/check-runs?per_page=100&filter=latest")"
-            total="$(jq -r '.total_count' <<< "$runs")"
-            pending="$(jq '[.check_runs[] | select(.status != "completed")] | length' <<< "$runs")"
-            failing="$(jq -r '[.check_runs[] | select(.status == "completed") | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral") | .name] | join(", ")' <<< "$runs")"
+            runs="$(gh api "/repos/$GH_REPO/commits/$sha/check-runs?per_page=100")"
+            latest="$(jq '[.check_runs[]] | sort_by(.id) | group_by(.name) | map(.[-1])' <<< "$runs")"
+            total="$(jq 'length' <<< "$latest")"
+            pending="$(jq '[.[] | select(.status != "completed")] | length' <<< "$latest")"
+            failing="$(jq -r '[.[] | select(.status == "completed") | select(.conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral") | .name] | join(", ")' <<< "$latest")"
 
             if [ -n "$failing" ]; then
               refuse "These checks are failing: $failing. Fix them and run \`/merge\` again."
