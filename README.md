@@ -52,26 +52,6 @@ jobs:
 
 The client id is read from the `HEXABOT_CLIENT_ID` variable. The workflow does not use `GITHUB_TOKEN` at all: it is scoped to `permissions: {}` and every API call goes through the app installation token, limited to the current repository with `contents: write` and `pull-requests: write`.
 
-### `renovate-approve.yml`
-
-Approves dependency pull requests with the app so GitHub can merge them with native auto-merge, keeping the required checks enforced by GitHub.
-
-```yaml
-on:
-  pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review]
-
-permissions: {}
-
-jobs:
-  approve:
-    uses: hexadrop/github-workflows/.github/workflows/renovate-approve.yml@v1
-    secrets:
-      app-private-key: ${{ secrets.HEXABOT_PRIVATE_KEY }}
-```
-
-It only runs for pull requests authored by `app/renovate` with the `dependencies` label and skips drafts. Because `dismiss_stale_reviews_on_push` dismisses the previous approval on every push, it approves again on `synchronize`.
-
 ### `merge-command.yml`
 
 Merges a pull request with the method required by the repository policy when a maintainer comments `/merge` on it.
