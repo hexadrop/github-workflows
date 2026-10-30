@@ -75,7 +75,7 @@ jobs:
 | `changeset-release/*`, `internal/sync-*`, `release/*` | merge commit |
 | anything else | squash |
 
-Pull requests into `main` are refused unless they come from `changeset-release/*`, `release/*` or `hotfix/*`.
+Pull requests into `main` are refused unless they come from `changeset-release/*`, `release/*` or `hotfix/*`, but only in repositories that have a `develop` branch: repositories that work directly on `main` accept squash merges into it.
 
 The workflow:
 
