@@ -128,6 +128,11 @@ jobs:
 |-------------------|----------|-------------------------|--------------------------------------------------------------------------------------------------------------|
 | `base-branch`     | no       | `main`                  | Base branch for the release PR                                                                               |
 | `version-command` | no       | `bun changeset version` | Command used to version the release. GitHub Action repos can use `bun changeset version && bun run build && git add dist/index.js` to ship the rebuilt bundle in the release PR |
+| `use-app-token`   | no       | `false`                 | Push the release commit with the `hexabot` app token instead of `GITHUB_TOKEN`. Needed when the base branch requires approvals: the bot commit would otherwise leave the checks in `action_required` |
+
+| Secret            | Required              | Description                             |
+|-------------------|-----------------------|-----------------------------------------|
+| `app-private-key` | when `use-app-token`  | Private key of the `hexabot` GitHub App |
 
 ### `sync-to-develop.yml`
 
@@ -149,6 +154,11 @@ jobs:
 | Input      | Required | Default                                               | Description                                                              |
 |------------|----------|-------------------------------------------------------|--------------------------------------------------------------------------|
 | `pr-title` | no       | `chore: sync from {{main_branch}} to {{develop_branch}}` | Title for the sync PR. Use `{{main_branch}}` and `{{develop_branch}}` placeholders |
+| `use-app-token` | no  | `false`                                               | Push the sync branch and open the PR with the `hexabot` app token instead of `GITHUB_TOKEN`, so the checks of the sync PR start without approval |
+
+| Secret            | Required              | Description                             |
+|-------------------|-----------------------|-----------------------------------------|
+| `app-private-key` | when `use-app-token`  | Private key of the `hexabot` GitHub App |
 
 ## Versioning
 

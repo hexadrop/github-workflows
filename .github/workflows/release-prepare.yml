@@ -13,6 +13,15 @@ on:
         required: false
         type: string
         default: 'bun changeset version'
+      use-app-token:
+        description: 'Push the release commit with the hexabot GitHub App token instead of GITHUB_TOKEN'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      app-private-key:
+        description: 'Private key of the hexabot GitHub App. Required when use-app-token is true'
+        required: false
 
 jobs:
   release-prepare:
@@ -79,6 +88,18 @@ jobs:
 
           echo "has-release=false" >> "$GITHUB_OUTPUT"
 
+      - name: Mint app token
+        id: app
+        if: inputs.use-app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.HEXABOT_APP_ID }}
+          private-key: ${{ secrets.app-private-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - name: Create or update release pull request
         if: steps.release-version.outputs.has-release == 'true'
         uses: changesets/action@v2.1.1
@@ -89,7 +110,7 @@ jobs:
           commit-message: 'chore: release v${{ steps.release-version.outputs.version }}'
           pr-title: 'chore: release v${{ steps.release-version.outputs.version }}'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ inputs.use-app-token && steps.app.outputs.token || secrets.GITHUB_TOKEN }}
 
       - name: Add release label to release pull request
         if: steps.release-version.outputs.has-release == 'true'
