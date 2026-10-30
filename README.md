@@ -82,7 +82,7 @@ The workflow:
 1. Ignores bot comments and only accepts `OWNER`, `MEMBER` or `COLLABORATOR` authors.
 2. Marks `changeset-release/*` pull requests as ready (they are created as drafts) and refuses other drafts.
 3. Refuses conflicted pull requests and updates the branch when it is behind its base.
-4. Approves the pull request with the app and enables GitHub auto-merge with the resolved method, so the required checks are still enforced by GitHub.
+4. Approves the pull request with the app, merges it directly when it is ready, and enables GitHub auto-merge with the resolved method when the checks are still running. The required checks are always enforced by GitHub.
 5. Comments the result and reacts with 👀 / 🚀 / 👎.
 
 Auto-merge has to be enabled in the repository:
