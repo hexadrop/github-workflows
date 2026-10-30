@@ -28,7 +28,7 @@ jobs:
           private-key: ${{ secrets.app-private-key }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
-          permission-contents: read
+          permission-contents: write
           permission-issues: write
           permission-pull-requests: write
 
@@ -142,6 +142,20 @@ jobs:
             merge_method="SQUASH"
           fi
 
+          state="$(gh pr view "$PR_NUMBER" --json mergeStateStatus --jq '.mergeStateStatus')"
+
+          if [ "$state" = "CLEAN" ]; then
+            if output="$(gh api --method PUT "/repos/$GH_REPO/pulls/$PR_NUMBER/merge" \
+              -f merge_method="$method" \
+              -f sha="$sha" 2>&1)"; then
+              post "Merged with **$method** at \`${sha:0:7}\`."
+              react "rocket"
+            else
+              refuse "Merge failed: $output"
+            fi
+            exit 0
+          fi
+
           if gh api graphql \
             -f query='mutation($pr: ID!, $method: PullRequestMergeMethod!) { enablePullRequestAutoMerge(input: {pullRequestId: $pr, mergeMethod: $method}) { pullRequest { number } } }' \
             -f pr="$pr_id" \
@@ -149,5 +163,5 @@ jobs:
             post "Queued **$method** merge for \`${sha:0:7}\`. GitHub will merge it as soon as the required checks pass."
             react "rocket"
           else
-            refuse "Could not enable auto-merge. Check that auto-merge is enabled in the repository settings."
+            refuse "Could not merge or enable auto-merge (state: $state). Check that auto-merge is enabled in the repository settings."
           fi
