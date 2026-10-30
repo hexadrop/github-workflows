@@ -94,10 +94,15 @@ jobs:
             changeset-release/* | internal/sync-* | release/*) method="merge" ;;
           esac
 
-          if [ "$base" = "main" ]; then
+          has_develop="false"
+          if gh api "/repos/$GH_REPO/branches/develop" > /dev/null 2>&1; then
+            has_develop="true"
+          fi
+
+          if [ "$base" = "main" ] && [ "$has_develop" = "true" ]; then
             case "$head" in
               changeset-release/* | release/* | hotfix/*) ;;
-              *) refuse "This pull request targets \`main\` from \`$head\`, which is not a release, sync or hotfix branch. Merge it by hand if that is intended." ;;
+              *) refuse "This pull request targets \`main\` from \`$head\`, which is not a release or hotfix branch. Merge it by hand if that is intended." ;;
             esac
           fi
 
