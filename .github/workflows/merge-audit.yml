@@ -1,0 +1,63 @@
+name: "Pull Request: merge audit"
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  audit:
+    name: Audit
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check the merge method
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          set -euo pipefail
+
+          # Keep in sync with merge-command.yml
+          method="squash"
+          case "$HEAD_REF" in
+            changeset-release/* | internal/sync-* | release/*) method="merge" ;;
+          esac
+
+          has_develop="false"
+          if gh api "/repos/$GH_REPO/branches/develop" > /dev/null 2>&1; then
+            has_develop="true"
+          fi
+
+          allowed="true"
+          if [ "$BASE_REF" = "main" ] && [ "$has_develop" = "true" ]; then
+            case "$HEAD_REF" in
+              changeset-release/* | release/* | hotfix/*) ;;
+              *) allowed="false" ;;
+            esac
+          fi
+
+          parents="$(gh api "/repos/$GH_REPO/commits/$MERGE_SHA" --jq '.parents | length')"
+          actual="squash"
+          if [ "$parents" = "2" ]; then
+            actual="merge"
+          fi
+
+          if [ "$allowed" = "false" ]; then
+            gh pr comment "$PR_NUMBER" --body "This pull request was merged into \`$BASE_REF\` from \`$HEAD_REF\`, which is not a release, sync or hotfix branch. Review the history of \`$BASE_REF\` if that was not intended."
+            exit 0
+          fi
+
+          if [ "$actual" = "$method" ]; then
+            echo "Merged with $actual, as expected"
+            exit 0
+          fi
+
+          gh pr comment "$PR_NUMBER" --body "This pull request should have been merged with **$method** (head \`$HEAD_REF\`), but it was merged with **$actual** (\`$MERGE_SHA\`). The history of \`$BASE_REF\` may need to be repaired; use \`/merge\` next time."
