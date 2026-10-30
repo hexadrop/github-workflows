@@ -52,6 +52,47 @@ jobs:
 
 The client id is read from the `HEXABOT_CLIENT_ID` variable. The workflow does not use `GITHUB_TOKEN` at all: it is scoped to `permissions: {}` and every API call goes through the app installation token, limited to the current repository with `contents: write` and `pull-requests: write`.
 
+### `merge-command.yml`
+
+Merges a pull request with the method required by the repository policy when a maintainer comments `/merge` on it.
+
+```yaml
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  merge:
+    uses: hexadrop/github-workflows/.github/workflows/merge-command.yml@v1
+    secrets:
+      app-private-key: ${{ secrets.HEXABOT_PRIVATE_KEY }}
+```
+
+| Head branch | Merge method |
+|-------------|--------------|
+| `changeset-release/*`, `internal/sync-*`, `release/*` | merge commit |
+| anything else | squash |
+
+Pull requests into `main` are refused unless they come from `changeset-release/*`, `release/*` or `hotfix/*`.
+
+The workflow:
+
+1. Ignores bot comments and only accepts `OWNER`, `MEMBER` or `COLLABORATOR` authors.
+2. Marks `changeset-release/*` pull requests as ready (they are created as drafts) and refuses other drafts.
+3. Refuses conflicted pull requests and updates the branch when it is behind its base.
+4. Approves the pull request with the app and enables GitHub auto-merge with the resolved method, so the required checks are still enforced by GitHub.
+5. Comments the result and reacts with 👀 / 🚀 / 👎.
+
+Auto-merge has to be enabled in the repository:
+
+```bash
+gh api --method PATCH "repos/$OWNER/$REPO" -F allow_auto_merge=true
+```
+
+The caller has to live on the default branch: `issue_comment` only runs workflows from there. `HEXABOT_CLIENT_ID` and `HEXABOT_PRIVATE_KEY` are required.
+
 ### `release.yml`
 
 Publishes stable or beta releases using Changesets. The workflow dispatches to one of four conditional jobs based on the `target` and `snapshot` inputs:
