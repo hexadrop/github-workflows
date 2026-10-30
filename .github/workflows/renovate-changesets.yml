@@ -1,0 +1,45 @@
+name: "Renovate: add changeset"
+
+on:
+  workflow_call:
+    inputs:
+      label:
+        description: 'Label that marks dependency pull requests'
+        required: false
+        type: string
+        default: 'dependencies'
+    secrets:
+      app-private-key:
+        description: 'Private key of the hexabot GitHub App'
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: renovate-changesets-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  changeset:
+    name: Add changeset
+    runs-on: ubuntu-latest
+    if: contains(github.event.pull_request.labels.*.name, inputs.label)
+
+    steps:
+      - name: Mint app token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.HEXABOT_APP_ID }}
+          private-key: ${{ secrets.app-private-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Add changeset
+        uses: mscharley/dependency-changesets-action@v1.2.5
+        with:
+          token: ${{ steps.app.outputs.token }}
+          use-conventional-commits: true
+          sign-commits: true

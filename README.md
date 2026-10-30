@@ -24,6 +24,34 @@ jobs:
 
 The cache key is composed as `${{ runner.os }}-${{ matrix.command }}`.
 
+### `renovate-changesets.yml`
+
+Adds a Changesets entry to dependency pull requests. The commit is pushed with a GitHub App token (`hexabot`) instead of `GITHUB_TOKEN`, so the checks of the new commit start without maintainer approval and every event stays attributed to the app.
+
+```yaml
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions: {}
+
+jobs:
+  changeset:
+    uses: hexadrop/github-workflows/.github/workflows/renovate-changesets.yml@v1
+    secrets:
+      app-private-key: ${{ secrets.HEXABOT_PRIVATE_KEY }}
+```
+
+| Input   | Required | Default        | Description                               |
+|---------|----------|----------------|-------------------------------------------|
+| `label` | no       | `dependencies` | Label that marks dependency pull requests |
+
+| Secret            | Required | Description                             |
+|-------------------|----------|-----------------------------------------|
+| `app-private-key` | yes      | Private key of the `hexabot` GitHub App |
+
+The app id is read from the `HEXABOT_APP_ID` variable. The workflow does not use `GITHUB_TOKEN` at all: it is scoped to `permissions: {}` and every API call goes through the app installation token, limited to the current repository with `contents: write` and `pull-requests: write`.
+
 ### `release.yml`
 
 Publishes stable or beta releases using Changesets. The workflow dispatches to one of four conditional jobs based on the `target` and `snapshot` inputs:
