@@ -1,0 +1,153 @@
+name: "Pull Request: merge command"
+
+on:
+  workflow_call:
+    secrets:
+      app-private-key:
+        description: 'Private key of the hexabot GitHub App'
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: merge-command-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    name: Merge
+    if: github.event.issue.pull_request != null
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Mint app token
+        id: app
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.HEXABOT_CLIENT_ID }}
+          private-key: ${{ secrets.app-private-key }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: read
+          permission-issues: write
+          permission-pull-requests: write
+
+      - name: Run merge command
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_USER_TYPE: ${{ github.event.comment.user.type }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+        run: |
+          set -euo pipefail
+
+          post() {
+            gh pr comment "$PR_NUMBER" --body "$1" > /dev/null
+            echo "$1"
+          }
+
+          react() {
+            gh api --method POST \
+              "/repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions" \
+              -f content="$1" > /dev/null 2>&1 || true
+          }
+
+          refuse() {
+            post "$1"
+            react "-1"
+            exit 0
+          }
+
+          command="$(printf '%s' "$COMMENT_BODY" | head -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          if [ "$command" != "/merge" ]; then
+            exit 0
+          fi
+
+          if [ "$COMMENT_USER_TYPE" = "Bot" ]; then
+            echo "Ignoring a bot comment"
+            exit 0
+          fi
+
+          case "$AUTHOR_ASSOCIATION" in
+            OWNER | MEMBER | COLLABORATOR) ;;
+            *) refuse "Only users with write access can run \`/merge\`." ;;
+          esac
+
+          react "eyes"
+
+          pr="$(gh pr view "$PR_NUMBER" \
+            --json id,headRefName,baseRefName,isDraft,mergeable,mergeStateStatus,headRefOid,autoMergeRequest,reviewDecision)"
+          pr_id="$(jq -r '.id' <<< "$pr")"
+          head="$(jq -r '.headRefName' <<< "$pr")"
+          base="$(jq -r '.baseRefName' <<< "$pr")"
+          draft="$(jq -r '.isDraft' <<< "$pr")"
+          mergeable="$(jq -r '.mergeable' <<< "$pr")"
+          state="$(jq -r '.mergeStateStatus' <<< "$pr")"
+          sha="$(jq -r '.headRefOid' <<< "$pr")"
+          queued="$(jq -r '.autoMergeRequest != null' <<< "$pr")"
+
+          method="squash"
+          case "$head" in
+            changeset-release/* | internal/sync-* | release/*) method="merge" ;;
+          esac
+
+          if [ "$base" = "main" ]; then
+            case "$head" in
+              changeset-release/* | release/* | hotfix/*) ;;
+              *) refuse "This pull request targets \`main\` from \`$head\`, which is not a release, sync or hotfix branch. Merge it by hand if that is intended." ;;
+            esac
+          fi
+
+          if [ "$draft" = "true" ]; then
+            case "$head" in
+              changeset-release/*)
+                gh api graphql \
+                  -f query='mutation($pr: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $pr}) { pullRequest { isDraft } } }' \
+                  -f pr="$pr_id" > /dev/null
+                echo "Marked the release pull request as ready"
+                ;;
+              *) refuse "This pull request is a draft. Mark it as ready before running \`/merge\`." ;;
+            esac
+          fi
+
+          if [ "$mergeable" = "CONFLICTING" ] || [ "$state" = "DIRTY" ]; then
+            refuse "This pull request has conflicts with \`$base\`. Resolve them and run \`/merge\` again."
+          fi
+
+          if [ "$state" = "BEHIND" ]; then
+            gh api graphql \
+              -f query='mutation($pr: ID!, $sha: GitObjectID) { updatePullRequestBranch(input: {pullRequestId: $pr, expectedHeadOid: $sha}) { clientMutationId } }' \
+              -f pr="$pr_id" \
+              -f sha="$sha" > /dev/null
+            echo "Updated the branch with $base"
+          fi
+
+          if [ "$queued" = "true" ]; then
+            post "Auto-merge is already queued with **$method**."
+            react "rocket"
+            exit 0
+          fi
+
+          gh api --method POST "/repos/$GH_REPO/pulls/$PR_NUMBER/reviews" \
+            -f event=APPROVE \
+            -f body="Approved by hexabot for \`/merge\`." > /dev/null 2>&1 \
+            || echo "Could not approve the pull request (already approved or authored by the app)"
+
+          if [ "$method" = "merge" ]; then
+            merge_method="MERGE"
+          else
+            merge_method="SQUASH"
+          fi
+
+          if gh api graphql \
+            -f query='mutation($pr: ID!, $method: PullRequestMergeMethod!) { enablePullRequestAutoMerge(input: {pullRequestId: $pr, mergeMethod: $method}) { pullRequest { number } } }' \
+            -f pr="$pr_id" \
+            -f method="$merge_method" > /dev/null; then
+            post "Queued **$method** merge for \`${sha:0:7}\`. GitHub will merge it as soon as the required checks pass."
+            react "rocket"
+          else
+            refuse "Could not enable auto-merge. Check that auto-merge is enabled in the repository settings."
+          fi
