@@ -138,8 +138,23 @@ jobs:
       - name: Capture release version
         run: |
           bun changeset status --output=release.json
-          echo "NEW_VERSION=$(jq -r '.releases[0].newVersion' release.json)" >> "$GITHUB_ENV"
+
+          is_monorepo="false"
+          if [[ -f package.json ]] && jq -e '((.workspaces // []) | length) > 0' package.json > /dev/null 2>&1; then
+            is_monorepo="true"
+          elif [[ -f pnpm-workspace.yaml ]]; then
+            is_monorepo="true"
+          fi
+
+          version="$(jq -r '.releases[0].newVersion // empty' release.json)"
+          releases="$(jq -r '.releases | length' release.json)"
           rm release.json
+
+          if [[ "$is_monorepo" == "true" ]] || [[ "$releases" -gt 1 ]]; then
+            echo "NEW_TITLE=chore: release" >> "$GITHUB_ENV"
+          else
+            echo "NEW_TITLE=chore: release v$version" >> "$GITHUB_ENV"
+          fi
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
@@ -147,8 +162,8 @@ jobs:
         with:
           publish-script: bun changeset publish
           version-script: bun changeset version
-          commit-message: 'chore: release v${{env.NEW_VERSION}}'
-          pr-title: 'chore: release v${{env.NEW_VERSION}}'
+          commit-message: ${{ env.NEW_TITLE }}
+          pr-title: ${{ env.NEW_TITLE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

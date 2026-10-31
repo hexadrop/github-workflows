@@ -198,6 +198,8 @@ jobs:
 |-------------------|-----------------------|-----------------------------------------|
 | `app-private-key` | when `use-app-token`  | Private key of the `hexabot` GitHub App |
 
+The release is titled `chore: release` in monorepos (a root `package.json` with `workspaces`, a `pnpm-workspace.yaml`, or more than one package released), where a single version number would be misleading. Single-package repositories keep `chore: release vX.Y.Z`.
+
 ### `sync-to-develop.yml`
 
 Creates a sync PR from the merged base branch to the corresponding develop branch.
