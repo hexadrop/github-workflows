@@ -158,6 +158,17 @@ jobs:
 
 With the `tags` target, stable releases create the tag `vX.Y.Z` (from `package-json-path`), force-move the major tag `vX`, and create a GitHub Release with `--latest --generate-notes`. Snapshot releases compute a beta version via `bun changeset version --snapshot beta`, restore `package.json`/`CHANGELOG.md` afterwards, tag the snapshot version, and create a GitHub prerelease. Existing tags are skipped, so reruns are safe.
 
+For `registry` + `snapshot: true`, the repository's `.changeset/config.json` has to enable the calculated version. Without it Changesets publishes `0.0.0-<tag>-<datetime>`, which does not continue the version line:
+
+```json
+"snapshot": {
+  "useCalculatedVersion": true,
+  "prereleaseTemplate": "{tag}-{datetime}"
+}
+```
+
+With that configuration, a package at `5.0.0` with a patch changeset publishes `5.0.1-beta-<datetime>`.
+
 | Output      | Description                                              |
 |-------------|----------------------------------------------------------|
 | `published` | `'true'` if packages were published or tags created      |
