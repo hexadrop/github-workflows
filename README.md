@@ -237,6 +237,8 @@ jobs:
 |-------------------|-----------------------|-----------------------------------------|
 | `app-private-key` | when `use-app-token`  | Private key of the `hexabot` GitHub App |
 
+The workflow creates the `internal:sync` label when the repository does not have it. The pull request needs that label to skip the validation workflow, and `gh pr create` fails when a label does not exist.
+
 ## Versioning
 
 This repository follows semantic versioning via Git tags:
