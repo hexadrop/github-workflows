@@ -158,6 +158,13 @@ jobs:
           if [[ $pull_request != "" ]]; then
             gh pr edit "$pull_request" -b "$pr_body"
           else
+            # The pull request needs the label to skip the validation workflow.
+            gh api "repos/$GITHUB_REPOSITORY/labels/internal:sync" > /dev/null 2>&1 \
+              || gh label create 'internal:sync' \
+                   --description 'Automated main to develop synchronization' \
+                   --color 'eeeeee' > /dev/null 2>&1 \
+              || true
+
             gh pr create --base "$develop" \
               --title "$title" \
               --label 'internal:sync' \
