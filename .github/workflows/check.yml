@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         default: '["lint:ci"]'
+      ref:
+        description: 'Git ref or SHA to check out. Empty checks out the ref of the triggering event.'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   check:
@@ -26,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup bun
         uses: oven-sh/setup-bun@v2

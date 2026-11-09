@@ -17,12 +17,24 @@ jobs:
       cache-commands: '["lint:ci"]'
 ```
 
-| Input            | Required | Default                    | Description                                  |
-|------------------|----------|----------------------------|----------------------------------------------|
-| `commands`       | no       | `["lint:ci", "typecheck"]` | JSON array of commands to run                |
-| `cache-commands` | no       | `["lint:ci"]`              | JSON array of commands that should use cache |
+| Input            | Required | Default                    | Description                                                                 |
+|------------------|----------|----------------------------|-----------------------------------------------------------------------------|
+| `commands`       | no       | `["lint:ci", "typecheck"]` | JSON array of commands to run                                               |
+| `cache-commands` | no       | `["lint:ci"]`              | JSON array of commands that should use cache                                |
+| `ref`            | no       | `''`                       | Git ref or SHA to check out. Empty checks out the ref of the triggering event |
 
 The cache key is composed as `${{ runner.os }}-${{ matrix.command }}`.
+
+Set `ref` when the calling workflow runs on `workflow_run`, where the default checkout resolves the head of the default branch instead of the workflow run SHA:
+
+```yaml
+jobs:
+  check:
+    uses: hexadrop/github-workflows/.github/workflows/check.yml@v1
+    with:
+      commands: '["lint:ci","typecheck"]'
+      ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+```
 
 ### `renovate-changesets.yml`
 
