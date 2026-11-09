@@ -33,6 +33,10 @@ on:
         required: false
         type: string
         default: ''
+    secrets:
+      registry-token:
+        description: 'Token used to authenticate against GitHub Packages. Defaults to github.token.'
+        required: false
 
 jobs:
   check:
@@ -87,7 +91,7 @@ jobs:
         if: inputs.registry == 'github'
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.registry-token || github.token }}
         run: echo "NODE_AUTH_TOKEN=${GH_TOKEN}" >> "$GITHUB_ENV"
 
       - name: Install dependencies

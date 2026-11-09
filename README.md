@@ -54,6 +54,27 @@ jobs:
       registry-scope: '@mariomh8'
 ```
 
+When the packages were published from another repository, `github.token` cannot read them. Pass a token with `read:packages` as the `registry-token` secret:
+
+```yaml
+jobs:
+  check:
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      registry-token: ${{ secrets.PACKAGES_TOKEN }}
+    uses: hexadrop/github-workflows/.github/workflows/check.yml@v1
+    with:
+      commands: '["lint:ci","typecheck"]'
+      registry: github
+      registry-scope: '@mariomh8'
+```
+
+| Secret           | Required | Description                                                        |
+|------------------|----------|--------------------------------------------------------------------|
+| `registry-token` | no       | Token used to authenticate against GitHub Packages. Defaults to `github.token` |
+
 ### `renovate-changesets.yml`
 
 Adds a Changesets entry to dependency pull requests. The commit is pushed with a GitHub App token (`hexabot`) instead of `GITHUB_TOKEN`, so the checks of the new commit start without maintainer approval and every event stays attributed to the app.
@@ -277,6 +298,7 @@ jobs:
 | Secret            | Required              | Description                             |
 |-------------------|-----------------------|-----------------------------------------|
 | `app-private-key` | when `use-app-token`  | Private key of the `hexabot` GitHub App |
+| `registry-token`  | no                    | Token used to authenticate against GitHub Packages. Defaults to `github.token` |
 
 Set `registry` and `registry-scope` when the release preparation needs private packages during `bun install --frozen-lockfile`:
 
@@ -287,6 +309,8 @@ jobs:
       contents: write
       packages: read
       pull-requests: write
+    secrets:
+      registry-token: ${{ secrets.PACKAGES_TOKEN }}
     uses: hexadrop/github-workflows/.github/workflows/release-prepare.yml@v1
     with:
       base-branch: main
