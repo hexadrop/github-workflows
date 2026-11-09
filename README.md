@@ -22,6 +22,9 @@ jobs:
 | `commands`       | no       | `["lint:ci", "typecheck"]` | JSON array of commands to run                                               |
 | `cache-commands` | no       | `["lint:ci"]`              | JSON array of commands that should use cache                                |
 | `ref`            | no       | `''`                       | Git ref or SHA to check out. Empty checks out the ref of the triggering event |
+| `registry`       | no       | `''`                       | Registry provider for private npm packages: `npmjs` or `github`. Empty disables registry setup |
+| `registry-url`   | no       | `''`                       | Optional npm registry URL override                                          |
+| `registry-scope` | no       | `''`                       | npm scope for the registry, for example `@mariomh8`. Required when `registry` is `github` |
 
 The cache key is composed as `${{ runner.os }}-${{ matrix.command }}`.
 
@@ -34,6 +37,21 @@ jobs:
     with:
       commands: '["lint:ci","typecheck"]'
       ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+```
+
+Set `registry` and `registry-scope` when the repository installs private npm packages. The workflow configures `actions/setup-node` and exports `NODE_AUTH_TOKEN` from `github.token`:
+
+```yaml
+jobs:
+  check:
+    permissions:
+      contents: read
+      packages: read
+    uses: hexadrop/github-workflows/.github/workflows/check.yml@v1
+    with:
+      commands: '["lint:ci","typecheck"]'
+      registry: github
+      registry-scope: '@mariomh8'
 ```
 
 ### `renovate-changesets.yml`
@@ -252,10 +270,29 @@ jobs:
 | `base-branch`     | no       | `main`                  | Base branch for the release PR                                                                               |
 | `version-command` | no       | `bun changeset version` | Command used to version the release. GitHub Action repos can use `bun changeset version && bun run build && git add dist/index.js` to ship the rebuilt bundle in the release PR |
 | `use-app-token`   | no       | `false`                 | Push the release commit with the `hexabot` app token instead of `GITHUB_TOKEN`. Needed when the base branch requires approvals: the bot commit would otherwise leave the checks in `action_required` |
+| `registry`        | no       | `''`                    | Registry provider for private npm packages: `npmjs` or `github`. Empty disables registry setup |
+| `registry-url`    | no       | `''`                    | Optional npm registry URL override |
+| `registry-scope`  | no       | `''`                    | npm scope for the registry, for example `@mariomh8`. Required when `registry` is `github` |
 
 | Secret            | Required              | Description                             |
 |-------------------|-----------------------|-----------------------------------------|
 | `app-private-key` | when `use-app-token`  | Private key of the `hexabot` GitHub App |
+
+Set `registry` and `registry-scope` when the release preparation needs private packages during `bun install --frozen-lockfile`:
+
+```yaml
+jobs:
+  release-prepare:
+    permissions:
+      contents: write
+      packages: read
+      pull-requests: write
+    uses: hexadrop/github-workflows/.github/workflows/release-prepare.yml@v1
+    with:
+      base-branch: main
+      registry: github
+      registry-scope: '@mariomh8'
+```
 
 The release is titled `chore: release` in monorepos (a root `package.json` with `workspaces`, a `pnpm-workspace.yaml`, or more than one package released), where a single version number would be misleading. Single-package repositories keep `chore: release vX.Y.Z`.
 
