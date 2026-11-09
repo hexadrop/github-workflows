@@ -219,6 +219,30 @@ jobs:
 
 For `registry: github`, the caller must grant `packages: write` and set `registry-scope` (required in that case); the workflow exports `NODE_AUTH_TOKEN` from `github.token`. Registry setup is defined inline in the reusable workflow, without a local action.
 
+When the repository installs packages published from another repository, pass a token with `read:packages` as the `registry-token` secret. The workflow uses it for installation and switches to `github.token` for publication:
+
+```yaml
+jobs:
+  release:
+    permissions:
+      contents: write
+      packages: write
+      issues: write
+      pull-requests: write
+    secrets:
+      registry-token: ${{ secrets.PACKAGES_TOKEN }}
+    uses: hexadrop/github-workflows/.github/workflows/release.yml@v1
+    with:
+      snapshot: false
+      concurrency-group: release
+      registry: github
+      registry-scope: '@mariomh8'
+```
+
+| Secret           | Required | Description                                                        |
+|------------------|----------|--------------------------------------------------------------------|
+| `registry-token` | no       | Token used to install private packages. Defaults to `github.token` |
+
 Set `build-command` to build the packages once before they are versioned and published:
 
 ```yaml
