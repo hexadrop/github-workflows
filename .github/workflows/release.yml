@@ -100,12 +100,38 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup registry
-        uses: ./.github/actions/setup-registry
+      - name: Validate registry provider
+        shell: bash
+        env:
+          PROVIDER: ${{ inputs.registry }}
+          SCOPE: ${{ inputs.registry-scope }}
+        run: |
+          case "${PROVIDER}" in
+            npmjs|github) ;;
+            *)
+              echo "::error::Unsupported registry provider '${PROVIDER}'. Use 'npmjs' or 'github'."
+              exit 1
+              ;;
+          esac
+
+          if [[ "${PROVIDER}" == "github" && -z "${SCOPE}" ]]; then
+            echo "::error::registry-scope is required when registry is 'github'."
+            exit 1
+          fi
+
+      - name: Setup npm registry
+        uses: actions/setup-node@v7
         with:
-          provider: ${{ inputs.registry }}
-          url: ${{ inputs.registry-url }}
-          scope: ${{ inputs.registry-scope }}
+          node-version: '24'
+          registry-url: ${{ inputs.registry-url || (inputs.registry == 'github' && 'https://npm.pkg.github.com' || 'https://registry.npmjs.org') }}
+          scope: ${{ inputs.registry == 'github' && inputs.registry-scope || '' }}
+
+      - name: Export GitHub Packages token
+        if: inputs.registry == 'github'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "NODE_AUTH_TOKEN=${GH_TOKEN}" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -144,12 +170,38 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup registry
-        uses: ./.github/actions/setup-registry
+      - name: Validate registry provider
+        shell: bash
+        env:
+          PROVIDER: ${{ inputs.registry }}
+          SCOPE: ${{ inputs.registry-scope }}
+        run: |
+          case "${PROVIDER}" in
+            npmjs|github) ;;
+            *)
+              echo "::error::Unsupported registry provider '${PROVIDER}'. Use 'npmjs' or 'github'."
+              exit 1
+              ;;
+          esac
+
+          if [[ "${PROVIDER}" == "github" && -z "${SCOPE}" ]]; then
+            echo "::error::registry-scope is required when registry is 'github'."
+            exit 1
+          fi
+
+      - name: Setup npm registry
+        uses: actions/setup-node@v7
         with:
-          provider: ${{ inputs.registry }}
-          url: ${{ inputs.registry-url }}
-          scope: ${{ inputs.registry-scope }}
+          node-version: '24'
+          registry-url: ${{ inputs.registry-url || (inputs.registry == 'github' && 'https://npm.pkg.github.com' || 'https://registry.npmjs.org') }}
+          scope: ${{ inputs.registry == 'github' && inputs.registry-scope || '' }}
+
+      - name: Export GitHub Packages token
+        if: inputs.registry == 'github'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "NODE_AUTH_TOKEN=${GH_TOKEN}" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: bun install --frozen-lockfile

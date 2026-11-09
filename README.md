@@ -166,7 +166,7 @@ jobs:
       registry-scope: '@mariomh8'
 ```
 
-For `registry: github`, the caller must grant `packages: write`; the workflow exports `NODE_AUTH_TOKEN` from `github.token`.
+For `registry: github`, the caller must grant `packages: write` and set `registry-scope` (required in that case); the workflow exports `NODE_AUTH_TOKEN` from `github.token`. Registry setup is defined inline in the reusable workflow, without a local action.
 
 | Input               | Required | Default      | Description                                                                                             |
 |---------------------|----------|--------------|---------------------------------------------------------------------------------------------------------|
@@ -177,7 +177,7 @@ For `registry: github`, the caller must grant `packages: write`; the workflow ex
 | `package-json-path` | no       | `package.json` | Manifest that holds the version. Set it in monorepos, where the root manifest has no version.         |
 | `registry`          | no       | `'npmjs'`    | `npmjs` or `github`. Selects the registry provider.                                                      |
 | `registry-url`      | no       | `''`         | Optional registry URL override.                                                                          |
-| `registry-scope`    | no       | `''`         | npm scope for the registry, for example `@mariomh8`.                                                     |
+| `registry-scope`    | no       | `''`         | npm scope for the registry, for example `@mariomh8`. Required when `registry` is `github`.                |
 
 With the `tags` target, stable releases create the tag `vX.Y.Z` (from `package-json-path`), force-move the major tag `vX`, and create a GitHub Release with `--latest --generate-notes`. Snapshot releases compute a beta version via `bun changeset version --snapshot beta`, restore `package.json`/`CHANGELOG.md` afterwards, tag the snapshot version, and create a GitHub prerelease. Existing tags are skipped, so reruns are safe.
 
