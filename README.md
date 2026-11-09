@@ -168,6 +168,18 @@ jobs:
 
 For `registry: github`, the caller must grant `packages: write` and set `registry-scope` (required in that case); the workflow exports `NODE_AUTH_TOKEN` from `github.token`. Registry setup is defined inline in the reusable workflow, without a local action.
 
+Set `build-command` to build the packages once before they are versioned and published:
+
+```yaml
+jobs:
+  release:
+    uses: hexadrop/github-workflows/.github/workflows/release.yml@v1
+    with:
+      snapshot: false
+      concurrency-group: release
+      build-command: bun run build
+```
+
 | Input               | Required | Default      | Description                                                                                             |
 |---------------------|----------|--------------|---------------------------------------------------------------------------------------------------------|
 | `snapshot`          | no       | `false`      | Publish a beta snapshot                                                                                 |
@@ -178,6 +190,7 @@ For `registry: github`, the caller must grant `packages: write` and set `registr
 | `registry`          | no       | `'npmjs'`    | `npmjs` or `github`. Selects the registry provider.                                                      |
 | `registry-url`      | no       | `''`         | Optional registry URL override.                                                                          |
 | `registry-scope`    | no       | `''`         | npm scope for the registry, for example `@mariomh8`. Required when `registry` is `github`.                |
+| `build-command`     | no       | `''`         | Optional command to build the packages once, before versioning and publishing. Empty means no build step. |
 
 With the `tags` target, stable releases create the tag `vX.Y.Z` (from `package-json-path`), force-move the major tag `vX`, and create a GitHub Release with `--latest --generate-notes`. Snapshot releases compute a beta version via `bun changeset version --snapshot beta`, restore `package.json`/`CHANGELOG.md` afterwards, tag the snapshot version, and create a GitHub prerelease. Existing tags are skipped, so reruns are safe.
 
