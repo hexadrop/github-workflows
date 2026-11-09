@@ -27,6 +27,21 @@ on:
         required: false
         type: string
         default: 'package.json'
+      registry:
+        description: 'Registry provider: npmjs or github'
+        required: false
+        type: string
+        default: 'npmjs'
+      registry-url:
+        description: 'Optional registry URL override'
+        required: false
+        type: string
+        default: ''
+      registry-scope:
+        description: 'npm scope for the registry (e.g. @mariomh8)'
+        required: false
+        type: string
+        default: ''
     outputs:
       published:
         description: 'Whether packages were published'
@@ -73,6 +88,7 @@ jobs:
     permissions:
       contents: 'write'
       id-token: 'write'
+      packages: 'write'
     outputs:
       published: ${{ steps.publish.outputs.published }}
     steps:
@@ -84,11 +100,12 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
+      - name: Setup registry
+        uses: ./.github/actions/setup-registry
         with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
+          provider: ${{ inputs.registry }}
+          url: ${{ inputs.registry-url }}
+          scope: ${{ inputs.registry-scope }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -96,7 +113,7 @@ jobs:
       - name: Generate beta snapshot
         run: bun changeset version --snapshot beta
 
-      - name: Publish beta to npm
+      - name: Publish beta to registry
         id: publish
         run: |
           bun changeset publish --tag beta --no-git-tag
@@ -114,6 +131,7 @@ jobs:
       contents: 'write'
       id-token: 'write'
       issues: 'write'
+      packages: 'write'
       pull-requests: 'write'
     outputs:
       published: ${{ steps.changesets.outputs.published }}
@@ -126,11 +144,12 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
+      - name: Setup registry
+        uses: ./.github/actions/setup-registry
         with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
+          provider: ${{ inputs.registry }}
+          url: ${{ inputs.registry-url }}
+          scope: ${{ inputs.registry-scope }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -156,7 +175,7 @@ jobs:
             echo "NEW_TITLE=chore: release v$version" >> "$GITHUB_ENV"
           fi
 
-      - name: Create Release Pull Request or Publish to npm
+      - name: Create Release Pull Request or Publish to registry
         id: changesets
         uses: changesets/action@v2.1.2
         with:
